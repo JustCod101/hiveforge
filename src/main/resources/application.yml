@@ -23,7 +23,7 @@ hiveforge:
   worker-timeout-seconds: 300
   llm:
     default-model: MiniMax-M2.5
-    worker-model: DeepSeek-V3.2
+    worker-model: glm-5
     api-key: ${OPENAI_API_KEY}
     base-url: ${OPENAI_BASE_URL}
 

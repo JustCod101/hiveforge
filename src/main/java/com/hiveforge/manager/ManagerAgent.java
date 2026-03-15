@@ -213,6 +213,10 @@ public class ManagerAgent {
             String finalReport = resultAggregator.aggregate(
                     userQuery, plan, results, callback);
 
+            // ===== 持久化报告到文件 =====
+            Path reportFile = saveReportToFile(taskId, userQuery, finalReport);
+            callback.onEvent("report_saved", "最终报告已保存: " + reportFile);
+
             // ===== Phase 5: 用后即焚 =====
             callback.onEvent("destroying", "清理 Worker 目录（用后即焚）...");
             for (SpawnedWorker worker : spawnedWorkers) {
@@ -743,6 +747,33 @@ public class ManagerAgent {
         } catch (Exception e) {
             log.warn("[Manager] JSON serialization failed", e);
             return "{}";
+        }
+    }
+
+    /**
+     * 将最终报告保存为 Markdown 文件到 data/reports/ 目录。
+     * 文件名: {taskId}.md，包含任务元信息头 + 报告正文。
+     */
+    private Path saveReportToFile(String taskId, String userQuery, String report) {
+        try {
+            Path reportsDir = Path.of("data", "reports");
+            Files.createDirectories(reportsDir);
+
+            String markdown = "# HiveForge Report\n\n"
+                    + "- **Task ID**: " + taskId + "\n"
+                    + "- **Query**: " + userQuery + "\n"
+                    + "- **Time**: " + Instant.now() + "\n\n"
+                    + "---\n\n"
+                    + report;
+
+            Path reportFile = reportsDir.resolve(taskId + ".md");
+            Files.writeString(reportFile, markdown);
+
+            log.info("[Manager] Report saved to: {}", reportFile.toAbsolutePath());
+            return reportFile;
+        } catch (IOException e) {
+            log.error("[Manager] Failed to save report file for task {}", taskId, e);
+            return Path.of("data/reports/" + taskId + ".md");
         }
     }
 }

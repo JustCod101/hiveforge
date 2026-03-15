@@ -42,9 +42,9 @@ class ToolRegistryTest {
      * 测试场景 1：初始化时自动注册内置工具并同步到数据库
      */
     @Test
-    void testInitRegistersBuiltinTools() {
+    void testInitRegistersBuiltinTools() throws Exception {
         // 调用初始化方法
-        toolRegistry.init();
+        toolRegistry.initTools().run(new String[0]);
 
         // 验证内置工具是否都已经被加载
         List<String> registeredTools = toolRegistry.getAllToolNames();
@@ -71,7 +71,7 @@ class ToolRegistryTest {
                 .thenThrow(new RuntimeException("DB Connection Refused"));
 
         // 执行注册
-        assertDoesNotThrow(() -> toolRegistry.init());
+        assertDoesNotThrow(() -> toolRegistry.initTools().run(new String[0]));
 
         // 验证即便 DB 挂了，工具也成功保存在了内存 Map 中
         assertTrue(toolRegistry.isAvailable("file_read"));
@@ -123,8 +123,8 @@ class ToolRegistryTest {
      * 测试场景 5：从内存与数据库中禁用工具
      */
     @Test
-    void testDisableTool() {
-        toolRegistry.init();
+    void testDisableTool() throws Exception {
+        toolRegistry.initTools().run(new String[0]);
         assertTrue(toolRegistry.isAvailable("file_read"));
 
         toolRegistry.disable("file_read");

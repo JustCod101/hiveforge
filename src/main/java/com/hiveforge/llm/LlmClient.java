@@ -99,8 +99,8 @@ public class LlmClient {
                 for (ToolDefinition tool : tools) {
                     toolsArray.add(tool.toJson(objectMapper));
                 }
-                // 让 LLM 自己决定是否调用工具
-                requestBody.put("tool_choice", "auto");
+                // 不显式设置 tool_choice，兼容 vLLM 等不支持 "auto" 的后端
+                // 大多数 OpenAI 兼容 API 默认行为即 auto
             }
 
             String jsonBody = objectMapper.writeValueAsString(requestBody);
