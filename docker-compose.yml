@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  hiveforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hiveforge
+    ports:
+      - "8080:8080"
+    environment:
+      # LLM API 配置（必填）
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      # 搜索 API 配置（可选）
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - SERP_API_KEY=${SERP_API_KEY:-}
+      # JVM 调优
+      - JAVA_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC
+    volumes:
+      # 持久化 SQLite 数据库
+      - hiveforge-data:/app/data
+      # 蜂巢工作目录（临时，Worker 用后即焚）
+      - /tmp/hive:/tmp/hive
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  hiveforge-data:
+    driver: local
