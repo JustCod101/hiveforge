@@ -40,6 +40,20 @@ public class WorkerTraceRepository {
             """, workerId, stepIndex, stepType, content, toolName, toolInput, toolOutput);
     }
 
+    /**
+     * 保存带延迟统计的 Trace 记录
+     */
+    public void saveWithLatency(String workerId, int stepIndex, String stepType,
+                                 String content, String toolName, String toolInput,
+                                 String toolOutput, long latencyMs) {
+        jdbc.update("""
+            INSERT INTO worker_trace (worker_id, step_index, step_type, content,
+                tool_name, tool_input, tool_output, latency_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, workerId, stepIndex, stepType, content, toolName, toolInput,
+                toolOutput, latencyMs);
+    }
+
     public List<WorkerTrace> findByWorkerId(String workerId) {
         return jdbc.query(
                 "SELECT * FROM worker_trace WHERE worker_id = ? ORDER BY step_index",
