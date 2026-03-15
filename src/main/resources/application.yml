@@ -29,3 +29,9 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+tavily:
+  api-key: ${TAVILY_API_KEY}
+
+serpapi:
+  api-key: ${SERP_API_KEY}
