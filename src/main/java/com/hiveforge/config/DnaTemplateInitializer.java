@@ -27,7 +27,7 @@ public class DnaTemplateInitializer {
     private record TemplateMeta(String category, String description) {}
 
     @Bean
-    @Order(2) // 在 DatabaseConfig 的 initDatabase (Order=默认) 之后执行
+    @Order(2) // 此时 Schema 已经由 Spring Boot 自动初始化 (schema.sql)
     public CommandLineRunner initDnaTemplates(DnaTemplateRepository templateRepo) {
         return args -> {
             Path templatesDir = Path.of("templates");

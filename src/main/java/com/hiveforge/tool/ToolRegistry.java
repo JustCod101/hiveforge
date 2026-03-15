@@ -5,10 +5,14 @@ import com.hiveforge.llm.ToolDefinition;
 import com.hiveforge.tool.builtin.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,19 +46,23 @@ public class ToolRegistry {
 
     /**
      * 启动时注册所有内置工具并同步到 DB。
+     * 使用 CommandLineRunner 确保在数据库初始化之后执行。
      */
-    @PostConstruct
-    public void init() {
-        // 注册内置工具
-        registerBuiltin(new FileReadTool());
-        registerBuiltin(new FileWriteTool());
-        registerBuiltin(new FileListTool());
-        registerBuiltin(new WebSearchTool(objectMapper));
-        registerBuiltin(new HttpCallTool());
-        registerBuiltin(new ShellExecuteTool());
-        registerBuiltin(new CalculateTool());
+    @Bean
+    @Order(3) // 在 DnaTemplateInitializer (Order=2) 之后执行
+    public CommandLineRunner initTools() {
+        return args -> {
+            // 注册内置工具
+            registerBuiltin(new FileReadTool());
+            registerBuiltin(new FileWriteTool());
+            registerBuiltin(new FileListTool());
+            registerBuiltin(new WebSearchTool(objectMapper));
+            registerBuiltin(new HttpCallTool());
+            registerBuiltin(new ShellExecuteTool());
+            registerBuiltin(new CalculateTool());
 
-        log.info("[ToolRegistry] Registered {} tools: {}", tools.size(), tools.keySet());
+            log.info("[ToolRegistry] Registered {} tools: {}", tools.size(), tools.keySet());
+        };
     }
 
     /**
