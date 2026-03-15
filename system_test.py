@@ -142,7 +142,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # 2. Test Execution (SSE)
-    query = "从零构建一个大语言模型"
+    query = "分析美股见顶了吗？"
     task_id = test_execute_hive(query)
     
     if task_id:

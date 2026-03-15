@@ -5,50 +5,486 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HiveForge Dashboard</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-               background: #0d1117; color: #c9d1d9; padding: 2rem; }
-        h1 { color: #58a6ff; margin-bottom: 1.5rem; }
-        .task-list { width: 100%; border-collapse: collapse; }
-        .task-list th, .task-list td { padding: 0.75rem 1rem; text-align: left;
-                                       border-bottom: 1px solid #21262d; }
-        .task-list th { color: #8b949e; font-weight: 600; }
-        .task-list tr:hover { background: #161b22; }
-        .status { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-        .status-COMPLETED { background: #238636; color: #fff; }
-        .status-EXECUTING { background: #1f6feb; color: #fff; }
-        .status-FAILED { background: #da3633; color: #fff; }
-        .status-PLANNING { background: #6e7681; color: #fff; }
-        .empty { text-align: center; padding: 3rem; color: #8b949e; }
+        /* Modern dark theme with CSS variables */
+        :root {
+            --bg: #0d1117;
+            --panel-bg: #161b22;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #1f6feb;
+            --success: #238636;
+            --error: #da3633;
+            --border: #30363d;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --transition: all 0.2s ease-in-out;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background: var(--panel-bg);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 1.5rem;
+            padding: 2rem;
+            flex: 1;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* Input section */
+        .query-box {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: var(--font-family);
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+        }
+
+        button {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            align-self: flex-start;
+        }
+
+        button:hover {
+            background: #2ea043;
+        }
+
+        button:disabled {
+            background: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Terminal styling */
+        .terminal {
+            background: #000;
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .log-entry { margin-bottom: 0.4rem; line-height: 1.4; }
+        .log-time { color: var(--text-muted); font-size: 0.8em; margin-right: 0.5rem; }
+        .log-type { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75em; margin-right: 0.5rem; font-weight: bold; }
+        
+        /* Log Colors */
+        .type-hive_start, .type-hive_complete { background: var(--success); color: #fff; }
+        .type-planning, .type-plan_ready { background: #8957e5; color: #fff; }
+        .type-spawning, .type-worker_spawned { background: #d2a8ff; color: #000; }
+        .type-executing, .type-worker_start, .type-worker_done { background: var(--accent); color: #000; }
+        .type-final_report { background: #f0883e; color: #fff; }
+        .type-hive_error { background: var(--error); color: #fff; }
+        .type-heartbeat { background: var(--border); color: var(--text-muted); }
+
+        .log-msg { color: #e6edf3; }
+
+        /* Report styling */
+        .final-report {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(35, 134, 54, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 6px;
+            display: none;
+        }
+        
+        .final-report h3 { color: var(--success); margin-bottom: 0.5rem; }
+        .report-content { white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+
+        /* History Table */
+        .task-list { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .task-list th, .task-list td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        .task-list th { color: var(--text-muted); font-weight: 600; }
+        .task-list tr:hover { background: rgba(255,255,255,0.05); cursor: pointer; }
+        .status { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .status-COMPLETED { background: rgba(35, 134, 54, 0.2); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.4); }
+        .status-EXECUTING { background: rgba(31, 111, 235, 0.2); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.4); }
+        .status-FAILED { background: rgba(218, 54, 51, 0.2); color: #ff7b72; border: 1px solid rgba(255, 123, 114, 0.4); }
+        .status-PLANNING { background: rgba(110, 118, 129, 0.2); color: #8b949e; border: 1px solid rgba(139, 148, 158, 0.4); }
+        .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+        
+        .badge { background: var(--border); padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem; }
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8); display: none;
+            justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal {
+            background: var(--panel-bg); width: 80%; max-width: 900px;
+            max-height: 90vh; border-radius: 8px; border: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .close-btn { background: transparent; color: var(--text-muted); padding: 0.5rem; font-size: 1.2rem; margin: 0; border: none; cursor: pointer; }
+        .close-btn:hover { color: var(--text-main); background: transparent; }
+
+        .worker-card { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; background: var(--bg); }
+        .worker-card h4 { color: var(--accent); margin-bottom: 0.5rem; }
+        .worker-card pre { background: #000; padding: 0.5rem; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; margin-top: 0.5rem; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
-    <h1>HiveForge Dashboard</h1>
+    <header>
+        <h1><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg> HiveForge Dashboard</h1>
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Multi-Agent Orchestration Platform</div>
+    </header>
 
-    <table class="task-list" th:if="${!tasks.isEmpty()}">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Query</th>
-                <th>Status</th>
-                <th>Workers</th>
-                <th>Created</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="task : ${tasks}">
-                <td th:text="${#strings.abbreviate(task.id, 12)}">id</td>
-                <td th:text="${#strings.abbreviate(task.userQuery, 60)}">query</td>
-                <td><span class="status" th:classappend="'status-' + ${task.status}"
-                          th:text="${task.status}">status</span></td>
-                <td th:text="${task.workerCount}">0</td>
-                <td th:text="${task.createdAt}">time</td>
-            </tr>
-        </tbody>
-    </table>
+    <main>
+        <!-- Left Panel: Execution -->
+        <div class="panel">
+            <div class="panel-header">
+                Execute Hive Task
+            </div>
+            <div class="panel-content">
+                <div class="query-box">
+                    <textarea id="queryInput" placeholder="Enter your complex task here...&#10;e.g., 'Research the latest advancements in solid-state batteries and write a comprehensive report.'"></textarea>
+                    <button id="executeBtn" onclick="startHiveTask()">Launch Hive</button>
+                </div>
+                
+                <h3 style="margin-bottom: 0.8rem; font-size: 1rem; color: var(--text-muted);">Execution Terminal</h3>
+                <div class="terminal" id="terminal">
+                    <div class="log-entry"><span class="log-time" th:text="${#dates.format(#dates.createNow(), 'HH:mm:ss')}">00:00:00</span> <span class="log-msg" style="color: #8b949e;">System ready. Waiting for task...</span></div>
+                </div>
 
-    <div class="empty" th:if="${tasks.isEmpty()}">
-        <p>No hive tasks yet. Send a request to <code>/api/v1/hive/execute?query=...</code></p>
+                <div class="final-report" id="finalReportSection">
+                    <h3>Final Report</h3>
+                    <div class="report-content" id="reportContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: History -->
+        <div class="panel">
+            <div class="panel-header">
+                Task History
+                <button onclick="location.reload()" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; background: var(--border); color: var(--text-main);">Refresh</button>
+            </div>
+            <div class="panel-content" style="padding: 0;">
+                <table class="task-list" th:if="${!tasks.isEmpty()}">
+                    <thead>
+                        <tr>
+                            <th>Query</th>
+                            <th>Status</th>
+                            <th>Workers</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="task : ${tasks}" th:data-task-id="${task.id}" onclick="openTaskModal(this.getAttribute('data-task-id'))">
+                            <td th:text="${#strings.abbreviate(task.userQuery, 30)}" th:title="${task.userQuery}">query</td>
+                            <td><span class="status" th:classappend="'status-' + ${task.status}" th:text="${task.status}">status</span></td>
+                            <td><span class="badge" th:text="${task.workerCount}">0</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="empty" th:if="${tasks.isEmpty()}">
+                    <p>No hive tasks yet.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for Task Details -->
+    <div class="modal-overlay" id="taskModal" onclick="if(event.target === this) closeTaskModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Task Details</h3>
+                <button class="close-btn" onclick="closeTaskModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalLoading">Loading...</div>
+                <div id="modalContent" style="display: none;">
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong>Query:</strong> <span id="modalQuery"></span>
+                    </div>
+                    <h4>Workers & DNA</h4>
+                    <div id="workersList" style="margin-top: 1rem;"></div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        let currentEventSource = null;
+
+        function appendLog(type, message) {
+            const terminal = document.getElementById('terminal');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const time = new Date().toLocaleTimeString();
+            const safeType = type.replace(/[^a-zA-Z0-9_-]/g, '');
+            const safeMsg = escapeHtml(message);
+            
+            entry.innerHTML = `<span class="log-time">${time}</span><span class="log-type type-${safeType}">${type.toUpperCase()}</span><span class="log-msg">${safeMsg}</span>`;
+            terminal.appendChild(entry);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function escapeHtml(unsafe) {
+            return (unsafe || '').toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function startHiveTask() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                alert('Please enter a task query.');
+                return;
+            }
+
+            const btn = document.getElementById('executeBtn');
+            btn.disabled = true;
+            btn.innerText = 'Executing...';
+            
+            document.getElementById('terminal').innerHTML = '';
+            document.getElementById('finalReportSection').style.display = 'none';
+            appendLog('system', 'Initializing SSE connection...');
+
+            if (currentEventSource) {
+                currentEventSource.close();
+            }
+
+            const url = '/api/v1/hive/execute?query=' + encodeURIComponent(query);
+            currentEventSource = new EventSource(url);
+
+            const events = ['hive_start', 'planning', 'plan_ready', 'spawning', 'worker_spawned', 
+                            'executing', 'strategy', 'worker_start', 'worker_done', 'aggregating', 
+                            'destroying', 'worker_destroyed', 'final_report', 'hive_complete', 'hive_error'];
+
+            events.forEach(eventType => {
+                currentEventSource.addEventListener(eventType, function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (eventType === 'final_report') {
+                            appendLog(eventType, 'Final report generated.');
+                            document.getElementById('finalReportSection').style.display = 'block';
+                            document.getElementById('reportContent').innerText = data.report || 'No report content.';
+                        } else {
+                            appendLog(eventType, data.message || JSON.stringify(data));
+                        }
+
+                        if (eventType === 'hive_complete' || eventType === 'hive_error') {
+                            finalizeExecution();
+                        }
+                    } catch(e) {
+                        appendLog('error', 'Failed to parse event data: ' + event.data);
+                    }
+                });
+            });
+
+            currentEventSource.addEventListener('heartbeat', function() {
+                // Heartbeats are ignored in terminal to reduce noise
+            });
+
+            currentEventSource.onerror = function(err) {
+                appendLog('error', 'Connection lost or server error.');
+                finalizeExecution();
+            };
+        }
+
+        function finalizeExecution() {
+            if (currentEventSource) {
+                currentEventSource.close();
+            }
+            const btn = document.getElementById('executeBtn');
+            btn.disabled = false;
+            btn.innerText = 'Launch Hive';
+        }
+
+        // Modal Logic
+        async function openTaskModal(taskId) {
+            document.getElementById('taskModal').style.display = 'flex';
+            document.getElementById('modalLoading').style.display = 'block';
+            document.getElementById('modalContent').style.display = 'none';
+            document.getElementById('modalTitle').innerText = 'Task: ' + taskId;
+            
+            try {
+                // Fetch Task Details
+                const taskRes = await fetch('/api/v1/hive/' + taskId);
+                const taskData = await taskRes.json();
+                document.getElementById('modalQuery').innerText = taskData.userQuery;
+
+                // Fetch Workers
+                const workersRes = await fetch('/api/v1/hive/' + taskId + '/workers');
+                const workersData = await workersRes.json();
+
+                const workersList = document.getElementById('workersList');
+                workersList.innerHTML = '';
+
+                if (workersData.length === 0) {
+                    workersList.innerHTML = '<p style="color: var(--text-muted)">No workers found for this task.</p>';
+                } else {
+                    workersData.forEach(w => {
+                        const card = document.createElement('div');
+                        card.className = 'worker-card';
+                        card.innerHTML = `
+                            <h4>${escapeHtml(w.worker_name || 'Worker')} <span style="font-size:0.8rem; color:var(--text-muted); font-weight:normal;">(Status: ${escapeHtml(w.status)})</span></h4>
+                            <details style="margin-top:0.5rem;">
+                                <summary style="cursor: pointer; color: var(--accent); font-size:0.9rem;">View TASK.md</summary>
+                                <pre>${escapeHtml(w.task_md || 'No TASK.md found')}</pre>
+                            </details>
+                            <details style="margin-top:0.5rem;">
+                                <summary style="cursor: pointer; color: var(--accent); font-size:0.9rem;">View SOUL.md</summary>
+                                <pre>${escapeHtml(w.soul_md || 'No SOUL.md found')}</pre>
+                            </details>
+                            <button style="margin-top:1rem; padding: 0.4rem 0.8rem; font-size: 0.85rem; background: var(--panel-bg); color: var(--text-main); border: 1px solid var(--border);" onclick="viewTraces('${w.id}', this)">Load Execution Traces</button>
+                            <div class="traces-container" style="margin-top: 1rem; display: none;"></div>
+                        `;
+                        workersList.appendChild(card);
+                    });
+                }
+
+                document.getElementById('modalLoading').style.display = 'none';
+                document.getElementById('modalContent').style.display = 'block';
+            } catch (err) {
+                document.getElementById('modalLoading').innerText = 'Failed to load data: ' + err.message;
+            }
+        }
+
+        function closeTaskModal() {
+            document.getElementById('taskModal').style.display = 'none';
+        }
+
+        async function viewTraces(workerId, btnElement) {
+            const container = btnElement.nextElementSibling;
+            if (container.style.display === 'block') {
+                container.style.display = 'none';
+                btnElement.innerText = 'Load Execution Traces';
+                return;
+            }
+
+            btnElement.innerText = 'Loading...';
+            try {
+                const res = await fetch('/api/v1/hive/workers/' + workerId + '/trace');
+                const traces = await res.json();
+                
+                container.innerHTML = '';
+                if (!traces || traces.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted)">No traces found.</p>';
+                } else {
+                    traces.forEach(t => {
+                        const tDiv = document.createElement('div');
+                        tDiv.style.borderLeft = '2px solid var(--border)';
+                        tDiv.style.paddingLeft = '1rem';
+                        tDiv.style.marginBottom = '1.5rem';
+                        tDiv.innerHTML = `
+                            <div style="font-size: 0.85rem; color: var(--accent); margin-bottom: 0.3rem; font-weight: 600;">Round ${t.roundNumber} <span style="color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${new Date(t.createdAt).toLocaleString()}</span></div>
+                            <div style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong style="color: var(--text-main)">Action:</strong> <span style="font-family: monospace; background: var(--border); padding: 0.1rem 0.3rem; border-radius: 3px;">${escapeHtml(t.actionType)}</span></div>
+                            <details style="margin-bottom: 0.5rem;">
+                                <summary style="cursor:pointer; font-size: 0.9rem; color: var(--text-muted);">Payload (Input)</summary>
+                                <pre>${escapeHtml(t.actionPayload)}</pre>
+                            </details>
+                            <details>
+                                <summary style="cursor:pointer; font-size: 0.9rem; color: var(--text-muted);">Observation (Output)</summary>
+                                <pre style="border-color: var(--success);">${escapeHtml(t.observation)}</pre>
+                            </details>
+                        `;
+                        container.appendChild(tDiv);
+                    });
+                }
+                container.style.display = 'block';
+                btnElement.innerText = 'Hide Execution Traces';
+            } catch (err) {
+                btnElement.innerText = 'Error loading traces';
+                console.error(err);
+            }
+        }
+    </script>
 </body>
 </html>
