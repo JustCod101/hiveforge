@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiveForge Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #0d1117; color: #c9d1d9; padding: 2rem; }
+        h1 { color: #58a6ff; margin-bottom: 1.5rem; }
+        .task-list { width: 100%; border-collapse: collapse; }
+        .task-list th, .task-list td { padding: 0.75rem 1rem; text-align: left;
+                                       border-bottom: 1px solid #21262d; }
+        .task-list th { color: #8b949e; font-weight: 600; }
+        .task-list tr:hover { background: #161b22; }
+        .status { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .status-COMPLETED { background: #238636; color: #fff; }
+        .status-EXECUTING { background: #1f6feb; color: #fff; }
+        .status-FAILED { background: #da3633; color: #fff; }
+        .status-PLANNING { background: #6e7681; color: #fff; }
+        .empty { text-align: center; padding: 3rem; color: #8b949e; }
+    </style>
+</head>
+<body>
+    <h1>HiveForge Dashboard</h1>
+
+    <table class="task-list" th:if="${!tasks.isEmpty()}">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Query</th>
+                <th>Status</th>
+                <th>Workers</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="task : ${tasks}">
+                <td th:text="${#strings.abbreviate(task.id, 12)}">id</td>
+                <td th:text="${#strings.abbreviate(task.userQuery, 60)}">query</td>
+                <td><span class="status" th:classappend="'status-' + ${task.status}"
+                          th:text="${task.status}">status</span></td>
+                <td th:text="${task.workerCount}">0</td>
+                <td th:text="${task.createdAt}">time</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="empty" th:if="${tasks.isEmpty()}">
+        <p>No hive tasks yet. Send a request to <code>/api/v1/hive/execute?query=...</code></p>
+    </div>
+</body>
+</html>

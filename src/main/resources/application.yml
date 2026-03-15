@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: hiveforge
+  datasource:
+    url: jdbc:sqlite:data/hiveforge.db
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: false
+
+hiveforge:
+  hive-base-dir: /tmp/hive
+  max-workers-per-task: 10
+  worker-timeout-seconds: 300
+  llm:
+    default-model: MiniMax-M2.5
+    worker-model: DeepSeek-V3.2
+    api-key: ${OPENAI_API_KEY}
+    base-url: ${OPENAI_BASE_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
