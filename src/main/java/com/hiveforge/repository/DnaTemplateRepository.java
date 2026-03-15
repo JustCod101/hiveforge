@@ -53,6 +53,17 @@ public class DnaTemplateRepository {
             INSERT INTO dna_template (template_name, category, soul_template,
                 agents_template, description)
             VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(template_name) DO UPDATE SET
+                category = excluded.category,
+                soul_template = excluded.soul_template,
+                agents_template = excluded.agents_template,
+                description = excluded.description
             """, templateName, category, soulTemplate, agentsTemplate, description);
+    }
+
+    public void incrementUsageCount(String templateName) {
+        jdbc.update(
+                "UPDATE dna_template SET usage_count = usage_count + 1 WHERE template_name = ?",
+                templateName);
     }
 }
