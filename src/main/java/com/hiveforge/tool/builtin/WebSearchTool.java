@@ -7,12 +7,10 @@ import com.hiveforge.tool.ToolResult;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
 
 /**
  * WebSearchTool — 通过 HTTP 调用搜索 API 获取互联网信息。
@@ -36,18 +34,14 @@ public class WebSearchTool implements Tool {
     /** 搜索结果最大返回长度 */
     private static final int MAX_RESULT_CHARS = 6000;
 
-    @Value("${tavily.api-key}")
-    private String tavilyApiKey;
+    private final String tavilyApiKey;
+    private final String serpApiKey;
 
-    @Value("${serpapi.api-key}")
-    private String serpApiKey;
-
-    public WebSearchTool(ObjectMapper objectMapper) {
+    public WebSearchTool(OkHttpClient httpClient, ObjectMapper objectMapper, String tavilyApiKey, String serpApiKey) {
+        this.httpClient = httpClient;
         this.objectMapper = objectMapper;
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .build();
+        this.tavilyApiKey = tavilyApiKey;
+        this.serpApiKey = serpApiKey;
 
         if (tavilyApiKey != null && !tavilyApiKey.isBlank()) {
             log.info("[WebSearch] Using Tavily API backend");

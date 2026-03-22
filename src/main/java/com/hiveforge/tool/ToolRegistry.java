@@ -3,12 +3,13 @@ package com.hiveforge.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hiveforge.llm.ToolDefinition;
 import com.hiveforge.tool.builtin.*;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.annotation.Order;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,13 +36,21 @@ public class ToolRegistry {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final OkHttpClient httpClient;
+
+    @Value("${tavily.api-key:}")
+    private String tavilyApiKey;
+
+    @Value("${serpapi.api-key:}")
+    private String serpApiKey;
 
     /** name → Tool 实例 */
     private final Map<String, Tool> tools = new LinkedHashMap<>();
 
-    public ToolRegistry(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public ToolRegistry(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, OkHttpClient httpClient) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.httpClient = httpClient;
     }
 
     /**
@@ -56,8 +65,8 @@ public class ToolRegistry {
             registerBuiltin(new FileReadTool());
             registerBuiltin(new FileWriteTool());
             registerBuiltin(new FileListTool());
-            registerBuiltin(new WebSearchTool(objectMapper));
-            registerBuiltin(new HttpCallTool());
+            registerBuiltin(new WebSearchTool(httpClient, objectMapper, tavilyApiKey, serpApiKey));
+            registerBuiltin(new HttpCallTool(httpClient));
             registerBuiltin(new ShellExecuteTool());
             registerBuiltin(new CalculateTool());
 

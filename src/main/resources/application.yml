@@ -1,14 +1,20 @@
 server:
   port: 8080
+  servlet:
+    async:
+      timeout: 900000            # Servlet 异步超时 15 分钟，与 Spring MVC async 保持一致
 
 spring:
   application:
     name: hiveforge
+  mvc:
+    async:
+      request-timeout: 900000   # 15 分钟，需 >= SseEmitter timeout (10min) + 缓冲
   datasource:
     url: jdbc:sqlite:data/hiveforge.db
     driver-class-name: org.sqlite.JDBC
     hikari:
-      maximum-pool-size: 1
+      maximum-pool-size: 5
   sql:
     init:
       mode: always
@@ -24,8 +30,9 @@ hiveforge:
   llm:
     default-model: MiniMax-M2.5
     worker-model: glm-5
-    api-key: ${OPENAI_API_KEY}
-    base-url: ${OPENAI_BASE_URL}
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:}
+    read-timeout-seconds: 300
 
 management:
   endpoints:
@@ -34,7 +41,7 @@ management:
         include: health,info,metrics
 
 tavily:
-  api-key: ${TAVILY_API_KEY}
+  api-key: ${TAVILY_API_KEY:}
 
 serpapi:
-  api-key: ${SERP_API_KEY}
+  api-key: ${SERP_API_KEY:}

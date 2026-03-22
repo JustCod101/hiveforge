@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.annotation.PreDestroy;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -276,6 +278,12 @@ public class HiveController {
     // ============================================================
     // 6. 任务历史列表
     // ============================================================
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdown();
+        heartbeatScheduler.shutdown();
+    }
 
     /**
      * GET /api/v1/hive/history?page=0&size=20 — 历史任务分页列表

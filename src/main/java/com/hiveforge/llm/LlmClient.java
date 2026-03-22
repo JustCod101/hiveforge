@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +21,12 @@ public class LlmClient {
 
     private static final Logger log = LoggerFactory.getLogger(LlmClient.class);
     private static final MediaType JSON_MEDIA = MediaType.get("application/json; charset=utf-8");
+
+    /** 最大重试次数（含首次调用） */
+    private static final int MAX_RETRIES = 3;
+
+    /** 重试间隔基数（毫秒），指数退避：2s, 4s */
+    private static final long RETRY_BASE_DELAY_MS = 2000;
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -36,13 +43,14 @@ public class LlmClient {
     @Value("${hiveforge.llm.worker-model:gpt-4o-mini}")
     private String workerModel;
 
-    public LlmClient(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(120, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+    public LlmClient(OkHttpClient httpClient, ObjectMapper objectMapper,
+                     @Value("${hiveforge.llm.read-timeout-seconds:300}") int readTimeoutSeconds) {
+        // 基于共享 client 派生 LLM 专用实例，使用更长的 readTimeout
+        // newBuilder() 共享连接池和线程池，仅覆盖超时配置
+        this.httpClient = httpClient.newBuilder()
+                .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
                 .build();
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -115,20 +123,75 @@ public class LlmClient {
                     .post(RequestBody.create(jsonBody, JSON_MEDIA))
                     .build();
 
-            try (Response response = httpClient.newCall(request).execute()) {
-                if (!response.isSuccessful()) {
-                    String errorBody = response.body() != null ? response.body().string() : "no body";
-                    log.error("[LLM] API error: {} - {}", response.code(), errorBody);
-                    throw new RuntimeException("LLM API error: " + response.code() + " - " + errorBody);
-                }
-
-                String responseBody = response.body().string();
-                return parseResponse(responseBody);
-            }
+            return executeWithRetry(request);
 
         } catch (IOException e) {
             log.error("[LLM] call failed", e);
             throw new RuntimeException("LLM call failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 带重试的 HTTP 请求执行。
+     * 对可重试异常（SocketTimeoutException、5xx 错误）进行指数退避重试。
+     */
+    private ChatResponse executeWithRetry(Request request) throws IOException {
+        IOException lastException = null;
+
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    String errorBody = response.body() != null ? response.body().string() : "no body";
+                    int code = response.code();
+
+                    // 5xx 服务端错误 或 429 限流 → 可重试
+                    if (isRetryableStatusCode(code) && attempt < MAX_RETRIES) {
+                        long delay = RETRY_BASE_DELAY_MS * (1L << (attempt - 1));
+                        log.warn("[LLM] Retryable API error (attempt {}/{}): {} - {}, retrying in {}ms",
+                                attempt, MAX_RETRIES, code, errorBody, delay);
+                        sleep(delay);
+                        continue;
+                    }
+
+                    log.error("[LLM] API error: {} - {}", code, errorBody);
+                    throw new RuntimeException("LLM API error: " + code + " - " + errorBody);
+                }
+
+                if (response.body() == null) {
+                    throw new RuntimeException("LLM API returned empty response body, status: " + response.code());
+                }
+                String responseBody = response.body().string();
+                return parseResponse(responseBody);
+
+            } catch (SocketTimeoutException e) {
+                lastException = e;
+                if (attempt < MAX_RETRIES) {
+                    long delay = RETRY_BASE_DELAY_MS * (1L << (attempt - 1));
+                    log.warn("[LLM] Timeout on attempt {}/{}, retrying in {}ms: {}",
+                            attempt, MAX_RETRIES, delay, e.getMessage());
+                    sleep(delay);
+                } else {
+                    log.error("[LLM] Timeout on final attempt {}/{}", attempt, MAX_RETRIES);
+                }
+            }
+        }
+
+        // 所有重试都失败
+        throw lastException != null ? lastException : new IOException("LLM call failed after " + MAX_RETRIES + " attempts");
+    }
+
+    /**
+     * 判断 HTTP 状态码是否可重试
+     */
+    private boolean isRetryableStatusCode(int code) {
+        return code == 429 || code == 502 || code == 503 || code == 504;
+    }
+
+    private void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

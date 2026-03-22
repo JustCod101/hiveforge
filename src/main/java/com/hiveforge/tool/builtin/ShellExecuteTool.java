@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -140,22 +141,28 @@ public class ShellExecuteTool implements Tool {
 
             Process process = pb.start();
 
-            // 读取输出
-            String output;
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                output = reader.lines().collect(Collectors.joining("\n"));
-            }
+            // 异步读取输出，避免管道缓冲区满导致死锁
+            CompletableFuture<String> outputFuture = CompletableFuture.supplyAsync(() -> {
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(process.getInputStream()))) {
+                    return reader.lines().collect(Collectors.joining("\n"));
+                } catch (Exception e) {
+                    return "(error reading output: " + e.getMessage() + ")";
+                }
+            });
 
             // 超时控制
             boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
+                String partialOutput = outputFuture.getNow("(output not available)");
                 log.warn("[Shell] Command timed out after {}s: {}", TIMEOUT_SECONDS, command);
                 return new ToolResult(false, String.format(
                         "Command timed out after %d seconds. Partial output:\n%s",
-                        TIMEOUT_SECONDS, truncate(output)));
+                        TIMEOUT_SECONDS, truncate(partialOutput)));
             }
+
+            String output = outputFuture.get(5, TimeUnit.SECONDS);
 
             int exitCode = process.exitValue();
             String truncatedOutput = truncate(output);

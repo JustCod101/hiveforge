@@ -82,9 +82,9 @@ public class CalculateTool implements Tool {
         try {
             // 预处理：替换常量
             String processed = expression
-                    .replace("PI", String.valueOf(Math.PI))
-                    .replace("pi", String.valueOf(Math.PI))
-                    .replace("E", String.valueOf(Math.E));
+                    .replaceAll("\\bPI\\b", String.valueOf(Math.PI))
+                    .replaceAll("\\bpi\\b", String.valueOf(Math.PI))
+                    .replaceAll("(?<![0-9.])\\bE\\b(?![0-9+-])", String.valueOf(Math.E));
 
             double result = evaluate(processed);
 

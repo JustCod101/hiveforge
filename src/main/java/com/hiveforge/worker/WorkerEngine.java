@@ -202,13 +202,13 @@ public class WorkerEngine {
             log.info("[Worker:{}] Completed in {}ms, {} LLM calls, {} tool calls",
                     worker.getName(), executionMs, totalLlmCalls, totalToolCalls);
 
-            return WorkerResult.success(worker.getName(), fullOutput.toString());
+            return WorkerResult.success(worker.getId(), worker.getName(), fullOutput.toString());
 
         } catch (Exception e) {
             long executionMs = (System.nanoTime() - startTime) / 1_000_000;
             workerRepo.updateFailed(worker.getId(), e.getMessage(), executionMs);
             log.error("[Worker:{}] Execution failed after {}ms", worker.getName(), executionMs, e);
-            return WorkerResult.failure(worker.getName(), e.getMessage());
+            return WorkerResult.failure(worker.getId(), worker.getName(), e.getMessage());
         }
     }
 

@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 /**
  * HttpCallTool — 发起 HTTP 请求获取 URL 内容。
@@ -49,13 +48,8 @@ public class HttpCallTool implements Tool {
             "instance-data", "metadata"
     );
 
-    public HttpCallTool() {
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .build();
+    public HttpCallTool(OkHttpClient httpClient) {
+        this.httpClient = httpClient;
     }
 
     @Override

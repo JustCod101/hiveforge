@@ -60,6 +60,12 @@ public class WorkerAgentRepository {
                 quality, workerName);
     }
 
+    public void updateResultQualityById(String workerId, double quality) {
+        jdbc.update(
+                "UPDATE worker_agent SET result_quality = ? WHERE id = ? AND result_quality IS NULL",
+                quality, workerId);
+    }
+
     public List<Map<String, Object>> findByTaskId(String taskId) {
         return jdbc.queryForList(
                 "SELECT * FROM worker_agent WHERE hive_task_id = ? ORDER BY spawned_at",

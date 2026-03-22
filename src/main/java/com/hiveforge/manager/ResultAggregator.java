@@ -206,7 +206,11 @@ public class ResultAggregator {
                 JsonNode score = scores.path(r.getWorkerName());
                 if (!score.isMissingNode() && score.isNumber()) {
                     double quality = score.asDouble();
-                    workerAgentRepo.updateResultQuality(r.getWorkerName(), quality);
+                    if (r.getWorkerId() != null) {
+                        workerAgentRepo.updateResultQualityById(r.getWorkerId(), quality);
+                    } else {
+                        workerAgentRepo.updateResultQuality(r.getWorkerName(), quality);
+                    }
                     log.info("[Aggregator] Worker [{}] quality score: {}", r.getWorkerName(), quality);
                 }
             }

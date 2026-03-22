@@ -16,6 +16,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PreDestroy;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -56,6 +59,9 @@ public class ManagerAgent {
 
     @Value("${hiveforge.max-workers-per-task:10}")
     private int maxWorkersPerTask;
+
+    @Value("${hiveforge.worker-timeout-seconds:300}")
+    private int workerTimeoutSeconds;
 
     /** Worker 执行线程池 — 虚拟线程风格，按任务动态伸缩 */
     private final ExecutorService workerExecutor = Executors.newCachedThreadPool(r -> {
@@ -440,8 +446,11 @@ public class ManagerAgent {
 
         List<CompletableFuture<WorkerResult>> futures = workers.stream()
                 .map(worker -> CompletableFuture.supplyAsync(
-                        () -> executeOneWorker(worker, callback),
-                        workerExecutor))
+                                () -> executeOneWorker(worker, callback),
+                                workerExecutor)
+                        .orTimeout(workerTimeoutSeconds, TimeUnit.SECONDS)
+                        .exceptionally(ex -> WorkerResult.failure(worker.getName(),
+                                "Worker timed out after " + workerTimeoutSeconds + "s: " + ex.getMessage())))
                 .toList();
 
         // 等待所有 Worker 完成
@@ -580,8 +589,11 @@ public class ManagerAgent {
                                     WorkerResult.failure(name, "Worker not found in spawned list"));
                         }
                         return CompletableFuture.supplyAsync(
-                                () -> executeOneWorker(w, callback),
-                                workerExecutor);
+                                        () -> executeOneWorker(w, callback),
+                                        workerExecutor)
+                                .orTimeout(workerTimeoutSeconds, TimeUnit.SECONDS)
+                                .exceptionally(ex -> WorkerResult.failure(name,
+                                        "Worker timed out after " + workerTimeoutSeconds + "s: " + ex.getMessage()));
                     })
                     .toList();
 
@@ -775,5 +787,10 @@ public class ManagerAgent {
             log.error("[Manager] Failed to save report file for task {}", taskId, e);
             return Path.of("data/reports/" + taskId + ".md");
         }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        workerExecutor.shutdown();
     }
 }

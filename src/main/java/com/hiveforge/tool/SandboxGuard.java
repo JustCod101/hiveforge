@@ -3,6 +3,7 @@ package com.hiveforge.tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -41,6 +42,18 @@ public final class SandboxGuard {
                         "Path escape denied: '" + relativePath + "' resolves outside working directory");
             }
 
+            // Symlink 检测：如果文件已存在，解析真实路径防止 symlink 逃逸
+            if (Files.exists(resolved)) {
+                Path realPath = resolved.toRealPath();
+                Path realBase = base.toRealPath();
+                if (!realPath.startsWith(realBase)) {
+                    log.warn("[Sandbox] Symlink escape attempt: base={}, real={}, input='{}'",
+                            realBase, realPath, relativePath);
+                    throw new SandboxViolationException(
+                            "Symlink escape denied: '" + relativePath + "' resolves outside working directory");
+                }
+            }
+
             return resolved;
         } catch (SandboxViolationException e) {
             throw e;
@@ -74,6 +87,24 @@ public final class SandboxGuard {
                     base, resolved, relativePath);
             throw new SandboxViolationException(
                     "Path must be within '" + subDir + "/' directory, got: '" + relativePath + "'");
+        }
+
+        // Symlink 检测
+        if (Files.exists(resolved)) {
+            try {
+                Path realPath = resolved.toRealPath();
+                Path realBase = base.toRealPath();
+                if (!realPath.startsWith(realBase)) {
+                    log.warn("[Sandbox] Symlink escape in subdir: base={}, real={}, input='{}'",
+                            realBase, realPath, relativePath);
+                    throw new SandboxViolationException(
+                            "Symlink escape denied in '" + subDir + "/': '" + relativePath + "'");
+                }
+            } catch (SandboxViolationException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new SandboxViolationException("Failed to resolve symlink: " + e.getMessage());
+            }
         }
 
         return resolved;

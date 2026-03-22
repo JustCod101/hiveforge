@@ -2,6 +2,9 @@
 -- HiveForge Database Schema (SQLite)
 -- ============================================================
 
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout=5000;
+
 -- 1. Hive Task (one user request = one hive task)
 CREATE TABLE IF NOT EXISTS hive_task (
     id              TEXT PRIMARY KEY,
